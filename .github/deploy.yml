@@ -1,0 +1,56 @@
+name: Déploiement GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # bouton « Run workflow » dans l'onglet Actions
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un déploiement à la fois ; on laisse finir celui en cours.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client    # le front vit dans client/, pas à la racine
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          # Pas de cache npm : sans package-lock.json commité, la clé de cache
+          # ne peut pas être calculée et l'étape échoue.
+
+      - run: npm install
+
+      - run: npm run build
+        env:
+          # Le site est servi depuis https://<pseudo>.github.io/<repo>/ :
+          # sans ce chemin de base, tous les assets renvoient 404.
+          VITE_BASE: /${{ github.event.repository.name }}/
+          # URL de l'API sur Render. À définir dans
+          # Settings > Secrets and variables > Actions > Variables.
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: client/dist        # chemin depuis la racine du dépôt
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
