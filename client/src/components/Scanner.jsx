@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 
 const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'qr_code'];
 
-/* Deux décodeurs : celui du navigateur quand il existe (Chrome Android, rapide
-   et sans dépendance), ZXing via html5-qrcode sinon (Safari iOS). */
+/* Deux décodeurs, un même <video> : celui du navigateur quand il existe (Chrome,
+   rapide et sans dépendance), ZXing sinon (Safari iOS, Firefox). */
 export default function Scanner({ onCode, onFermer }) {
   const videoRef = useRef(null);
   const [message, setMessage] = useState('Cadre le code-barres');
 
   useEffect(() => {
     let annule = false;
-    let flux = null, raf = null, lecteur = null;
+    let flux = null, raf = null, controles = null;
 
     const emettre = code => {
       if (annule) return;
@@ -43,18 +43,22 @@ export default function Scanner({ onCode, onFermer }) {
     };
 
     const secours = async () => {
-      const { Html5Qrcode, Html5QrcodeSupportedFormats: F } = await import('html5-qrcode');
+      const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([
+        import('@zxing/browser'), import('@zxing/library'),
+      ]);
       if (annule) return;
-      lecteur = new Html5Qrcode('reader', {
-        verbose: false,
-        formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.QR_CODE],
-      });
-      await lecteur.start(
-        { facingMode: 'environment' },
-        { fps: 10 }, // pas de qrbox : sur iOS il décale la zone de lecture et ajoute ses propres bordures
-        texte => emettre(texte),
-        () => {}
+      const F = BarcodeFormat;
+      const indices = new Map([
+        [DecodeHintType.POSSIBLE_FORMATS, [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.QR_CODE]],
+        [DecodeHintType.TRY_HARDER, true],
+      ]);
+      const lecteurZxing = new BrowserMultiFormatReader(indices, { delayBetweenScanAttempts: 100 });
+      controles = await lecteurZxing.decodeFromConstraints(
+        { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } } },
+        videoRef.current,
+        resultat => { if (resultat) emettre(resultat.getText()); }
       );
+      if (annule) controles.stop();
     };
 
     ('BarcodeDetector' in window ? natif() : secours()).catch(err => {
@@ -68,7 +72,7 @@ export default function Scanner({ onCode, onFermer }) {
       annule = true;
       if (raf) cancelAnimationFrame(raf);
       if (flux) flux.getTracks().forEach(t => t.stop());
-      if (lecteur) lecteur.stop().then(() => lecteur.clear()).catch(() => {});
+      if (controles) controles.stop();
     };
   }, [onCode]);
 
@@ -86,11 +90,9 @@ export default function Scanner({ onCode, onFermer }) {
     return () => document.removeEventListener('visibilitychange', surVisibilite);
   }, [onFermer]);
 
-  const natifDispo = 'BarcodeDetector' in window;
-
   return (
     <div className="scanner">
-      {natifDispo ? <video ref={videoRef} playsInline muted /> : <div id="reader" />}
+      <video ref={videoRef} playsInline muted autoPlay />
       <div className="viseur"><span /><span /><span /><span /></div>
       <p className="scanner-msg">{message}</p>
       <button className="btn-fermer" onClick={onFermer} aria-label="Fermer le scanner">

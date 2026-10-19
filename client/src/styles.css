@@ -307,20 +307,11 @@ input { font: inherit; }
   align-items: center;
   justify-content: center;
 }
-.scanner video, .scanner #reader {
+.scanner video {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: cover;
 }
-.scanner #reader { border: 0 !important; padding: 0 !important; overflow: hidden; }
-.scanner #reader :is(video, canvas) {
-  position: absolute !important; inset: 0 !important;
-  width: 100% !important; height: 100% !important; object-fit: cover;
-}
-/* html5-qrcode dessine ses propres bandes et cadres, qui masquent le côté droit sur iOS */
-.scanner #reader > div, .scanner #reader__scan_region { position: absolute !important; inset: 0 !important; min-height: 0 !important; }
-.scanner #qr-shaded-region { display: none !important; }
-.scanner #reader__dashboard { display: none !important; }
 
 .viseur {
   position: relative;
