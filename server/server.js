@@ -5,6 +5,7 @@ const config = require('./config');
 const store = require('./db');
 const { couleurType, sectionDuType, typeConnu } = require('./classification');
 const { chercherProduit } = require('./recherche');
+const { fabriquerClasseur } = require('./export');
 
 const app = express();
 app.use(express.json());
@@ -49,7 +50,22 @@ app.get('/api/reveil', route(async (req, res) => {
 app.post('/api/sessions', route(async (req, res) => {
   const prenom = String(req.body.prenom || '').trim().slice(0, 40);
   if (!prenom) return res.status(400).json({ erreur: 'Prénom manquant' });
-  res.json(await store.sessionCreer(crypto.randomUUID(), prenom));
+  const nom = String(req.body.nom || '').trim().slice(0, 60) || null;
+  res.json(await store.sessionCreer(crypto.randomUUID(), prenom, nom));
+}));
+
+app.patch('/api/sessions/:id', route(async (req, res) => {
+  const nom = String(req.body?.nom || '').trim().slice(0, 60) || null;
+  const s = await store.sessionRenommer(req.params.id, nom);
+  if (!s) return res.status(404).json({ erreur: 'Session introuvable' });
+  res.json(s);
+}));
+
+app.delete('/api/sessions/:id', route(async (req, res) => {
+  if (!await store.sessionSupprimer(req.params.id)) {
+    return res.status(404).json({ erreur: 'Session introuvable' });
+  }
+  res.json({ ok: true });
 }));
 
 app.post('/api/sessions/:id/fin', route(async (req, res) => {
@@ -137,6 +153,27 @@ app.delete('/api/produits/:id', route(async (req, res) => {
     return res.status(404).json({ erreur: 'Produit introuvable' });
   }
   res.json({ ok: true });
+}));
+
+/* ---------- classeur Excel : qui a acheté quoi ----------
+   ?session=<id> limite à une session, ?prenom=<nom> à une personne. */
+app.get('/api/export.xlsx', route(async (req, res) => {
+  const session = req.query.session || null;
+  const [produits, sessions] = await Promise.all([
+    store.produits({ session, personne: req.query.prenom || null }),
+    store.sessions(),
+  ]);
+  const concernee = session ? sessions.find(s => s.id === session) : null;
+  const tampon = await fabriquerClasseur({ produits, sessions, session: concernee });
+
+  const fichier = concernee
+    ? `courses-${(concernee.nom || concernee.prenom).replace(/[^\w-]+/g, '_')}.xlsx`
+    : `inventaire-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  res.set({
+    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'Content-Disposition': `attachment; filename="${fichier}"`,
+  });
+  res.send(Buffer.from(tampon));
 }));
 
 /* ---------- recherche produit ---------- */

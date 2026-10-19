@@ -1,6 +1,6 @@
 import { chipPeremption, chipStock } from '../peremption.js';
 
-export default function LigneArticle({ produit, seuils, onConsommer, onSupprimer, onCorriger }) {
+export default function LigneArticle({ produit, seuils, onConsommer, onSupprimer, onCorriger, onQuantite }) {
   const dlc = chipPeremption(produit.date_peremption, seuils);
   const stock = chipStock(produit);
 
@@ -30,9 +30,18 @@ export default function LigneArticle({ produit, seuils, onConsommer, onSupprimer
         {dlc && <span className={`chip-dlc ${dlc.classe}`}>{dlc.texte}</span>}
         {stock && <span className={`chip-dlc ${stock.classe}`}>{stock.texte}</span>}
 
+        <span className="stepper" title="Quantité achetée">
+          <button type="button" onClick={() => onQuantite(produit.id, -1)}
+                  disabled={!(produit.quantite_total > 0)}
+                  aria-label={`Une unité de moins de ${produit.article}`}>−</button>
+          <b>{produit.quantite_total ?? 0}</b>
+          <button type="button" onClick={() => onQuantite(produit.id, 1)}
+                  aria-label={`Une unité de plus de ${produit.article}`}>+</button>
+        </span>
+
         {produit.quantite_total > 0 && (
           <button className="btn-conso" onClick={() => onConsommer(produit.id)}
-                  title="J'en ai consommé un">−1</button>
+                  title="J'en ai consommé un">consommé</button>
         )}
         <button className="btn-suppr" onClick={() => onSupprimer(produit.id)}
                 aria-label={`Retirer ${produit.article}`}>×</button>

@@ -636,3 +636,25 @@ input { font: inherit; }
   font-size: 10px;
   opacity: .7;
 }
+
+/* ---------- sessions, quantités, export ---------- */
+
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--trait); border-radius: 3px; background: #fff; }
+.stepper button { background: none; border: none; width: 30px; padding: 3px 0; font-size: 17px; line-height: 1; }
+.stepper button:disabled { opacity: .3; }
+.stepper b { min-width: 22px; text-align: center; font-family: var(--mono); font-size: 13px; }
+
+.btn-excel {
+  display: block; margin-top: 14px; padding: 12px; text-align: center; text-decoration: none;
+  border: 2px solid var(--encre); border-radius: 3px; color: var(--encre);
+  font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+}
+.btn-excel:active { background: var(--encre); color: var(--papier); }
+
+.sessions { padding: 8px 0 30px; }
+.nouvelle-session { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 18px; border-bottom: 1px dashed var(--trait); }
+.nouvelle-session input { border: 1px solid var(--trait); border-radius: 3px; padding: 11px; background: #fff; }
+.session { padding: 12px 0; border-bottom: 1px dashed var(--trait); }
+.session.en-cours .article-nom { text-decoration: underline; text-decoration-color: var(--jaune); text-decoration-thickness: 3px; }
+.session .note { margin: 2px 0 8px; }
+a.puce-filtre { text-decoration: none; color: inherit; }

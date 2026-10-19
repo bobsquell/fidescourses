@@ -20,7 +20,15 @@ const poster = (url, corps) => requete(url, { method: 'POST', body: JSON.stringi
 export const urlApi = BASE;
 
 export const api = {
-  ouvrirSession: prenom => poster('/api/sessions', { prenom }),
+  ouvrirSession: (prenom, nom) => poster('/api/sessions', { prenom, nom }),
+  renommerSession: (id, nom) => requete(`/api/sessions/${id}`, {
+    method: 'PATCH', body: JSON.stringify({ nom }),
+  }),
+  supprimerSession: id => requete(`/api/sessions/${id}`, { method: 'DELETE' }),
+  /* Lien direct : le navigateur télécharge le fichier, même d'un autre domaine. */
+  urlExcel: ({ sessionId, prenom } = {}) => BASE + '/api/export.xlsx' + (
+    sessionId ? `?session=${encodeURIComponent(sessionId)}`
+      : prenom ? `?prenom=${encodeURIComponent(prenom)}` : ''),
   cloturerSession: id => poster(`/api/sessions/${id}/fin`, {}),
 
   produits: ({ sessionId, prenom } = {}) => requete(

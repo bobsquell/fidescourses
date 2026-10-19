@@ -63,6 +63,8 @@ async function initialiser() {
       PRIMARY KEY (type_produit, article)
     );
 
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS nom TEXT;
+
     CREATE INDEX IF NOT EXISTS idx_produits_session ON produits(session_id);
     CREATE INDEX IF NOT EXISTS idx_produits_code    ON produits(code_barres);
     CREATE INDEX IF NOT EXISTS idx_produits_par     ON produits(ajoute_par);
@@ -147,10 +149,22 @@ async function bdParType(type) {
   return rows.map(r => r.article);
 }
 
-async function sessionCreer(id, prenom) {
+async function sessionCreer(id, prenom, nom = null) {
   const { rows } = await q(
-    'INSERT INTO sessions (id, prenom) VALUES ($1, $2) RETURNING *', [id, prenom]);
+    'INSERT INTO sessions (id, prenom, nom) VALUES ($1, $2, $3) RETURNING *', [id, prenom, nom]);
   return rows[0];
+}
+
+async function sessionRenommer(id, nom) {
+  const { rows } = await q('UPDATE sessions SET nom = $2 WHERE id = $1 RETURNING *', [id, nom]);
+  return rows[0] || null;
+}
+
+/** Supprime la session et les articles qu'elle contient. */
+async function sessionSupprimer(id) {
+  await q('DELETE FROM produits WHERE session_id = $1', [id]);
+  const { rowCount } = await q('DELETE FROM sessions WHERE id = $1', [id]);
+  return rowCount > 0;
 }
 
 async function session(id) {
@@ -190,5 +204,5 @@ module.exports = {
   pool, initialiser, CHAMPS,
   ajouterProduit, modifierProduit, supprimerProduit, produits, produit,
   catalogueGet, catalogueSet, bdAjouter, bdParType,
-  sessionCreer, session, sessionCloturer, sessions, personnes,
+  sessionCreer, sessionRenommer, sessionSupprimer, session, sessionCloturer, sessions, personnes,
 };

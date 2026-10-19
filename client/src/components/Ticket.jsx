@@ -1,9 +1,13 @@
 import LigneArticle from './LigneArticle.jsx';
 import EtatSync from './EtatSync.jsx';
 import FiltrePersonne from './FiltrePersonne.jsx';
+import Sessions from './Sessions.jsx';
+import { api } from '../api.js';
 
-export default function Ticket({ prenom, vue, onChangerVue, produits, seuils, etat,
-                                 prenoms, filtre, onFiltrer,
+export default function Ticket({ session, vue, onChangerVue, produits, seuils, etat,
+                                 prenoms, filtre, onFiltrer, listeSessions,
+                                 onNouvelleSession, onActiverSession, onRenommerSession,
+                                 onSupprimerSession, onQuantite,
                                  onConsommer, onSupprimer, onCorriger }) {
   const montant = produits.reduce(
     (t, p) => t + (p.prix_achat || 0) * (p.quantite_total || 1), 0
@@ -14,14 +18,14 @@ export default function Ticket({ prenom, vue, onChangerVue, produits, seuils, et
       <header className="entete">
         <h1 className="enseigne">Inventaire<br />croisé</h1>
         <div className="meta">
-          <span>Caisse — {prenom}</span>
+          <span>{session.nom || 'Caisse'} — {session.prenom}</span>
           <span>{new Date().toLocaleDateString('fr-FR',
             { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
         </div>
       </header>
 
       <nav className="onglets" role="tablist">
-        {[['session', 'Session'], ['tout', "Tout l'inventaire"]].map(([cle, libelle]) => (
+        {[['session', 'Session'], ['tout', 'Inventaire'], ['sessions', 'Sessions']].map(([cle, libelle]) => (
           <button
             key={cle}
             role="tab"
@@ -33,10 +37,22 @@ export default function Ticket({ prenom, vue, onChangerVue, produits, seuils, et
         ))}
       </nav>
 
+      {vue === 'sessions' && (
+        <Sessions
+          sessions={listeSessions}
+          active={session}
+          onNouvelle={onNouvelleSession}
+          onActiver={onActiverSession}
+          onRenommer={onRenommerSession}
+          onSupprimer={onSupprimerSession}
+        />
+      )}
+
       {vue === 'tout' && (
         <FiltrePersonne prenoms={prenoms} actif={filtre} onChanger={onFiltrer} />
       )}
 
+      {vue !== 'sessions' && <>
       <div className="liste" aria-live="polite">
         {produits.map(p => (
           <LigneArticle
@@ -46,6 +62,7 @@ export default function Ticket({ prenom, vue, onChangerVue, produits, seuils, et
             onConsommer={onConsommer}
             onSupprimer={onSupprimer}
             onCorriger={onCorriger}
+            onQuantite={onQuantite}
           />
         ))}
       </div>
@@ -62,8 +79,13 @@ export default function Ticket({ prenom, vue, onChangerVue, produits, seuils, et
         <div className="ligne-total">
           <span>Montant</span><span>{montant ? `${montant.toFixed(2)} €` : '—'}</span>
         </div>
+        <a className="btn-excel" download
+           href={api.urlExcel(vue === 'session' ? { sessionId: session.id } : { prenom: filtre })}>
+          Télécharger l'Excel — qui a acheté quoi
+        </a>
         <EtatSync etat={etat} />
       </footer>
+      </>}
     </main>
   );
 }

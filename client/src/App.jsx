@@ -8,7 +8,6 @@ import FicheProduit from './components/FicheProduit.jsx';
 import CorrectionType from './components/CorrectionType.jsx';
 import Toast from './components/Toast.jsx';
 
-const DUREE_SESSION = 6 * 3600 * 1000; // au-delà, ce sont d'autres courses
 const SEUILS_DEFAUT = { rouge: 7, orange: 14, jaune: 30 };
 
 const sessionStockee = () => {
@@ -30,6 +29,7 @@ export default function App() {
   const [scannerOuvert, setScannerOuvert] = useState(false);
   const [fiche, setFiche] = useState(null);       // { produit, source, motif }
   const [correction, setCorrection] = useState(null);
+  const [listeSessions, setListeSessions] = useState([]);
   const [toast, setToast] = useState(null);
 
   const signaler = useCallback((message, erreur = false) => setToast({ message, erreur }), []);
@@ -41,14 +41,9 @@ export default function App() {
 
   /* --- reprise ou ouverture de session --- */
   useEffect(() => {
+    // Une session reste ouverte jusqu'à ce qu'on en choisisse une autre.
     const precedente = sessionStockee();
-    const fraiche = precedente && Date.now() - new Date(precedente.debut).getTime() < DUREE_SESSION;
-    if (fraiche) {
-      setSession(precedente);
-    } else if (precedente) {
-      api.cloturerSession(precedente.id).catch(() => {});
-      setPrenomInitial(precedente.prenom); // même personne, la plupart du temps
-    }
+    if (precedente) setSession(precedente);
   }, []);
 
   /* --- référentiel : types, sections, seuils --- */
@@ -74,7 +69,7 @@ export default function App() {
   }, []);
 
   const rafraichir = useCallback(async () => {
-    if (!session) return;
+    if (!session || vue === 'sessions') return;
     try {
       setProduits(await api.produits(
         vue === 'session' ? { sessionId: session.id } : { prenom: filtre || undefined }
@@ -85,13 +80,64 @@ export default function App() {
   useEffect(() => { if (session) chargerReferentiel(); }, [session, chargerReferentiel]);
   useEffect(() => { rafraichir(); }, [rafraichir]);
 
+  const chargerSessions = useCallback(async () => {
+    try { setListeSessions(await api.listeSessions()); }
+    catch (err) { signaler(err.message, true); }
+  }, [signaler]);
+  useEffect(() => { if (session && vue === 'sessions') chargerSessions(); }, [session, vue, chargerSessions]);
+
   /* --- actions --- */
 
-  const ouvrirSession = async prenom => {
+  const activer = s => {
+    localStorage.setItem('session', JSON.stringify(s));
+    setSession(s);
+    setProduits([]);
+    setVue('session');
+  };
+
+  const ouvrirSession = async (prenom, nom) => {
     try {
-      const nouvelle = await api.ouvrirSession(prenom);
-      localStorage.setItem('session', JSON.stringify(nouvelle));
-      setSession(nouvelle);
+      const nouvelle = await api.ouvrirSession(prenom, nom);
+      activer(nouvelle);
+      if (nom) signaler(`Session « ${nom} » créée`);
+    } catch (err) { signaler(err.message, true); }
+  };
+
+  const renommerSession = async (id, nom) => {
+    try {
+      const maj = await api.renommerSession(id, nom);
+      setListeSessions(l => l.map(s => (s.id === id ? { ...s, nom: maj.nom } : s)));
+      if (session.id === id) {
+        const renommee = { ...session, nom: maj.nom };
+        localStorage.setItem('session', JSON.stringify(renommee));
+        setSession(renommee);
+      }
+    } catch (err) { signaler(err.message, true); }
+  };
+
+  const supprimerSession = async id => {
+    try {
+      await api.supprimerSession(id);
+      if (session.id === id) {
+        localStorage.removeItem('session');
+        setSession(null);
+        return;
+      }
+      setListeSessions(l => l.filter(s => s.id !== id));
+      signaler('Session supprimée');
+    } catch (err) { signaler(err.message, true); }
+  };
+
+  const changerQuantite = async (id, delta) => {
+    const actuel = produits.find(p => p.id === id);
+    if (!actuel) return;
+    const total = Math.max(0, (actuel.quantite_total || 0) + delta);
+    try {
+      const produit = await api.modifier(id, {
+        quantite_total: total,
+        quantite_utilisee: Math.min(actuel.quantite_utilisee || 0, total),
+      });
+      setProduits(liste => liste.map(p => (p.id === id ? produit : p)));
     } catch (err) { signaler(err.message, true); }
   };
 
@@ -168,8 +214,14 @@ export default function App() {
   return (
     <>
       <Ticket
-        prenom={session.prenom}
+        session={session}
         vue={vue}
+        listeSessions={listeSessions}
+        onNouvelleSession={ouvrirSession}
+        onActiverSession={activer}
+        onRenommerSession={renommerSession}
+        onSupprimerSession={supprimerSession}
+        onQuantite={changerQuantite}
         onChangerVue={setVue}
         produits={produits}
         seuils={seuils}
@@ -182,10 +234,10 @@ export default function App() {
         onCorriger={setCorrection}
       />
 
-      <BarreAction
+      {vue !== 'sessions' && <BarreAction
         onScanner={() => setScannerOuvert(true)}
         onManuel={() => setFiche({ produit: {}, source: null, base: null, motif: null })}
-      />
+      />}
 
       {scannerOuvert && <Scanner onCode={surCode} onFermer={() => setScannerOuvert(false)} />}
 
