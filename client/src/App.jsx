@@ -20,7 +20,7 @@ const nomParDefaut = () => `Courses du ${new Date().toLocaleDateString('fr-FR')}
 export default function App() {
   const [prenom, setPrenom] = useState(prenomStocke);   // la personne connectée sur ce téléphone
   const [session, setSession] = useState(null);         // la session en cours, commune à tous
-  const [vue, setVue] = useState('session');
+  const [vue, setVue] = useState('moi');       // 'moi' | 'session' | 'sessions'
   const [produits, setProduits] = useState([]);
   const [listeSessions, setListeSessions] = useState([]);
   const [revision, setRevision] = useState(0);          // incrémentée à chaque modification, pour relire les détails ouverts
@@ -79,7 +79,7 @@ export default function App() {
   }, []);
 
   const rafraichir = useCallback(async (silencieux = false) => {
-    if (!session || vue !== 'session') return;
+    if (!session || vue === 'sessions') return;
     try {
       setProduits(await api.produits({ sessionId: session.id }));
     } catch (err) { if (!silencieux) signaler(err.message, true); }
@@ -122,7 +122,7 @@ export default function App() {
     setSession(null);
     setProduits([]);
     setFiltre(null);
-    setVue('session');
+    setVue('moi');
   };
 
   /* --- sessions --- */
@@ -131,7 +131,7 @@ export default function App() {
     setSession(s);
     setProduits([]);
     setFiltre(null);
-    setVue('session');
+    setVue('moi');
   };
 
   const nouvelleSession = async nom => {
@@ -252,6 +252,12 @@ export default function App() {
     } catch (err) { signaler(err.message, true); }
   };
 
+  const telechargerExcel = async params => {
+    try { await api.telechargerExcel(params); }
+    catch (err) { signaler(err.message === 'Failed to fetch' || err.name === 'TypeError'
+      ? "Serveur injoignable pour l'export" : err.message, true); }
+  };
+
   if (!prenom) return <EcranPrenom onOuvrir={connecter} />;
 
   return (
@@ -273,13 +279,14 @@ export default function App() {
         onRenommerSession={renommerSession}
         onSupprimerSession={supprimerSession}
         onDeconnecter={deconnecter}
+        onExcel={telechargerExcel}
         onQuantite={changerQuantite}
         onConsommer={consommer}
         onSupprimer={supprimer}
         onCorriger={setCorrection}
       />
 
-      {vue === 'session' && session && (
+      {vue !== 'sessions' && session && (
         <BarreAction
           onScanner={() => setScannerOuvert(true)}
           onManuel={() => setFiche({ produit: {}, source: null, base: null, motif: null })}

@@ -2,15 +2,16 @@ import LigneArticle from './LigneArticle.jsx';
 import EtatSync from './EtatSync.jsx';
 import FiltrePersonne from './FiltrePersonne.jsx';
 import Sessions from './Sessions.jsx';
-import { api } from '../api.js';
 import { parPersonne } from '../personnes.js';
 
 export default function Ticket({ prenom, session, vue, onChangerVue, produits, seuils, etat,
                                  filtre, onFiltrer, listeSessions, revision,
                                  onNouvelleSession, onRouvrirSession, onRenommerSession,
-                                 onSupprimerSession, onQuantite, onDeconnecter,
+                                 onSupprimerSession, onQuantite, onDeconnecter, onExcel,
                                  onConsommer, onSupprimer, onCorriger }) {
-  const visibles = filtre ? produits.filter(p => p.ajoute_par === filtre) : produits;
+  // « Mes achats » est verrouillé sur la personne connectée ; « Session en cours » laisse filtrer.
+  const personne = vue === 'moi' ? prenom : filtre;
+  const visibles = personne ? produits.filter(p => p.ajoute_par === personne) : produits;
   const montant = visibles.reduce((t, p) => t + (p.prix_achat || 0) * (p.quantite_total || 1), 0);
   const actions = { onConsommer, onSupprimer, onCorriger, onQuantite };
 
@@ -26,7 +27,7 @@ export default function Ticket({ prenom, session, vue, onChangerVue, produits, s
       </header>
 
       <nav className="onglets" role="tablist">
-        {[['session', 'Session en cours'], ['sessions', 'Sessions']].map(([cle, libelle]) => (
+        {[['moi', 'Mes achats'], ['session', 'Session en cours'], ['sessions', 'Sessions']].map(([cle, libelle]) => (
           <button
             key={cle}
             role="tab"
@@ -45,6 +46,7 @@ export default function Ticket({ prenom, session, vue, onChangerVue, produits, s
           seuils={seuils}
           revision={revision}
           actions={actions}
+          onExcel={onExcel}
           onNouvelle={onNouvelleSession}
           onRouvrir={onRouvrirSession}
           onRenommer={onRenommerSession}
@@ -52,8 +54,10 @@ export default function Ticket({ prenom, session, vue, onChangerVue, produits, s
         />
       )}
 
-      {vue === 'session' && session && <>
-        <FiltrePersonne personnes={parPersonne(produits)} actif={filtre} onChanger={onFiltrer} />
+      {vue !== 'sessions' && session && <>
+        {vue === 'session' && (
+          <FiltrePersonne personnes={parPersonne(produits)} actif={filtre} onChanger={onFiltrer} />
+        )}
 
         <div className="liste" aria-live="polite">
           {visibles.map(p => (
@@ -63,7 +67,7 @@ export default function Ticket({ prenom, session, vue, onChangerVue, produits, s
 
         {visibles.length === 0 && (
           <div className="vide">
-            <p>{filtre ? `Rien d'acheté par ${filtre}.` : 'Rien sur le ticket.'}</p>
+            <p>{personne ? `Rien d'acheté par ${personne === prenom ? 'toi' : personne}.` : 'Rien sur le ticket.'}</p>
             <p className="note">Scanne un code-barres pour commencer.</p>
           </div>
         )}
@@ -71,13 +75,13 @@ export default function Ticket({ prenom, session, vue, onChangerVue, produits, s
         <footer className="total">
           <div className="ligne-total"><span>Articles</span><span>{visibles.length}</span></div>
           <div className="ligne-total">
-            <span>Montant{filtre ? ` — ${filtre}` : ''}</span>
+            <span>Montant{personne ? ` — ${personne}` : ''}</span>
             <span>{montant ? `${montant.toFixed(2)} €` : '—'}</span>
           </div>
-          <a className="btn-excel" download
-             href={api.urlExcel({ sessionId: session.id, prenom: filtre })}>
+          <button type="button" className="btn-excel"
+                  onClick={() => onExcel({ sessionId: session.id, prenom: personne })}>
             Télécharger l'Excel — qui a acheté quoi
-          </a>
+          </button>
           <EtatSync etat={etat} />
         </footer>
       </>}

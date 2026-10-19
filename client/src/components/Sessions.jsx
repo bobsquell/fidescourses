@@ -29,7 +29,7 @@ function DetailSession({ id, seuils, revision, actions }) {
   ));
 }
 
-export default function Sessions({ sessions, active, seuils, revision, actions,
+export default function Sessions({ sessions, active, seuils, revision, actions, onExcel,
                                    onNouvelle, onRouvrir, onRenommer, onSupprimer }) {
   const [nom, setNom] = useState('');
   const [ouverte, setOuverte] = useState(null);
@@ -76,7 +76,7 @@ export default function Sessions({ sessions, active, seuils, revision, actions,
                 {ouverte === s.id ? 'Masquer' : 'Voir les achats'}
               </button>
               {!enCours && <button className="puce-filtre" onClick={() => onRouvrir(s)}>Reprendre</button>}
-              <a className="puce-filtre" download href={api.urlExcel({ sessionId: s.id })}>Excel</a>
+              <button className="puce-filtre" onClick={() => onExcel({ sessionId: s.id })}>Excel</button>
               <button className="puce-filtre" onClick={() => renommer(s)}>Renommer</button>
               <button className="btn-suppr" onClick={() => supprimer(s)}
                       aria-label={`Supprimer ${s.nom || s.prenom}`}>×</button>

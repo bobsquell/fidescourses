@@ -658,7 +658,7 @@ input { font: inherit; }
 .stepper b { min-width: 22px; text-align: center; font-family: var(--mono); font-size: 13px; }
 
 .btn-excel {
-  display: block; margin-top: 14px; padding: 12px; text-align: center; text-decoration: none;
+  display: block; width: 100%; background: none; margin-top: 14px; padding: 12px; text-align: center; text-decoration: none;
   border: 2px solid var(--encre); border-radius: 3px; color: var(--encre);
   font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
 }

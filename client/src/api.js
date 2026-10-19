@@ -27,6 +27,32 @@ export const api = {
     method: 'PATCH', body: JSON.stringify({ nom }),
   }),
   supprimerSession: id => requete(`/api/sessions/${id}`, { method: 'DELETE' }),
+  /* Téléchargé par fetch plutôt que par un simple lien : si le serveur répond mal,
+     on peut afficher pourquoi au lieu de ne rien faire. */
+  telechargerExcel: async ({ sessionId, prenom } = {}) => {
+    const rep = await fetch(api.urlExcel({ sessionId, prenom }));
+    if (!rep.ok) {
+      throw new Error(rep.status === 404
+        ? "Export introuvable : l'API n'est pas à jour (redéploie-la sur Render)"
+        : `Export impossible (erreur ${rep.status})`);
+    }
+    /* iOS (Safari comme Chrome) ignore souvent un téléchargement par blob lancé
+       après une attente réseau. Le serveur répond en pièce jointe : on laisse
+       donc le navigateur télécharger l'adresse elle-même. */
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent)
+      || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+    if (ios) {
+      window.location.assign(api.urlExcel({ sessionId, prenom }));
+      return;
+    }
+    const lien = document.createElement('a');
+    lien.href = URL.createObjectURL(await rep.blob());
+    lien.download = (/filename="([^"]+)"/.exec(rep.headers.get('Content-Disposition') || '') || [])[1] || 'inventaire.xlsx';
+    document.body.appendChild(lien);
+    lien.click();
+    lien.remove();
+    setTimeout(() => URL.revokeObjectURL(lien.href), 10000);
+  },
   /* Lien direct : le navigateur télécharge le fichier, même d'un autre domaine. */
   urlExcel: ({ sessionId, prenom } = {}) => BASE + '/api/export.xlsx' + (
     sessionId ? `?session=${encodeURIComponent(sessionId)}`
