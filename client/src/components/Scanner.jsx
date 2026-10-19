@@ -51,7 +51,7 @@ export default function Scanner({ onCode, onFermer }) {
       });
       await lecteur.start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 280, height: 160 } },
+        { fps: 10 }, // pas de qrbox : sur iOS il décale la zone de lecture et ajoute ses propres bordures
         texte => emettre(texte),
         () => {}
       );
@@ -71,6 +71,13 @@ export default function Scanner({ onCode, onFermer }) {
       if (lecteur) lecteur.stop().then(() => lecteur.clear()).catch(() => {});
     };
   }, [onCode]);
+
+  // Fige la page derrière : sur iOS elle défile sous le scanner et décale l'image.
+  useEffect(() => {
+    const avant = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = avant; };
+  }, []);
 
   // Couper la caméra dès que l'écran passe en arrière-plan.
   useEffect(() => {

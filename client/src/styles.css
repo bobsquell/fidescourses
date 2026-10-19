@@ -34,7 +34,7 @@ html, body {
   overscroll-behavior-y: none;
 }
 
-body { padding-bottom: calc(96px + var(--bas)); }
+body { overflow-x: hidden; max-width: 100%; padding-bottom: calc(96px + var(--bas)); }
 
 button { font: inherit; cursor: pointer; }
 input { font: inherit; }
@@ -46,6 +46,7 @@ input { font: inherit; }
   max-width: 560px;
   margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 0 var(--marge);
   box-shadow: 0 0 0 1px rgba(0,0,0,.04);
   position: relative;
@@ -296,6 +297,10 @@ input { font: inherit; }
 .scanner {
   position: fixed;
   inset: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;   /* iOS : 100vh dépasse sous la barre d'adresse */
+  overflow: hidden;
   background: #000;
   z-index: 40;
   display: flex;
@@ -307,7 +312,15 @@ input { font: inherit; }
   width: 100%; height: 100%;
   object-fit: cover;
 }
-.scanner #reader :is(video, canvas) { width: 100% !important; height: 100% !important; object-fit: cover; }
+.scanner #reader { border: 0 !important; padding: 0 !important; overflow: hidden; }
+.scanner #reader :is(video, canvas) {
+  position: absolute !important; inset: 0 !important;
+  width: 100% !important; height: 100% !important; object-fit: cover;
+}
+/* html5-qrcode dessine ses propres bandes et cadres, qui masquent le côté droit sur iOS */
+.scanner #reader > div, .scanner #reader__scan_region { position: absolute !important; inset: 0 !important; min-height: 0 !important; }
+.scanner #qr-shaded-region { display: none !important; }
+.scanner #reader__dashboard { display: none !important; }
 
 .viseur {
   position: relative;
