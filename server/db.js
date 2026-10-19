@@ -149,7 +149,21 @@ async function bdParType(type) {
   return rows.map(r => r.article);
 }
 
+/* Une seule session est « en cours » à la fois (fin IS NULL) : c'est celle que
+   tout le monde rejoint en se connectant. En ouvrir une autre clôture les précédentes. */
+const sessionEnCours = async () => {
+  const { rows } = await q('SELECT * FROM sessions WHERE fin IS NULL ORDER BY debut DESC LIMIT 1');
+  return rows[0] || null;
+};
+
+async function sessionRouvrir(id) {
+  await q('UPDATE sessions SET fin = now() WHERE fin IS NULL AND id <> $1', [id]);
+  const { rows } = await q('UPDATE sessions SET fin = NULL WHERE id = $1 RETURNING *', [id]);
+  return rows[0] || null;
+}
+
 async function sessionCreer(id, prenom, nom = null) {
+  await q('UPDATE sessions SET fin = now() WHERE fin IS NULL');
   const { rows } = await q(
     'INSERT INTO sessions (id, prenom, nom) VALUES ($1, $2, $3) RETURNING *', [id, prenom, nom]);
   return rows[0];
@@ -204,5 +218,5 @@ module.exports = {
   pool, initialiser, CHAMPS,
   ajouterProduit, modifierProduit, supprimerProduit, produits, produit,
   catalogueGet, catalogueSet, bdAjouter, bdParType,
-  sessionCreer, sessionRenommer, sessionSupprimer, session, sessionCloturer, sessions, personnes,
+  sessionCreer, sessionEnCours, sessionRouvrir, sessionRenommer, sessionSupprimer, session, sessionCloturer, sessions, personnes,
 };

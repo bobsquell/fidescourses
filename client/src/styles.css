@@ -671,3 +671,10 @@ input { font: inherit; }
 .session.en-cours .article-nom { text-decoration: underline; text-decoration-color: var(--jaune); text-decoration-thickness: 3px; }
 .session .note { margin: 2px 0 8px; }
 a.puce-filtre { text-decoration: none; color: inherit; }
+
+.lien-prenom { background: none; border: none; padding: 0; font: inherit; color: inherit; text-decoration: underline dotted; }
+.bloc-personne { margin-top: 12px; }
+.entete-personne {
+  display: flex; justify-content: space-between; margin: 0; padding: 6px 8px;
+  background: var(--papier-creux); font-family: var(--mono); font-size: 12px;
+}

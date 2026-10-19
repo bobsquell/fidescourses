@@ -24,8 +24,8 @@ export default function EcranPrenom({ prenomInitial = '', onOuvrir }) {
   return (
     <div className="voile">
       <div className="carte-prenom">
-        <p className="eyebrow">Nouvelle session</p>
-        <h1>Qui fait les courses&nbsp;?</h1>
+        <p className="eyebrow">Connexion</p>
+        <h1>Qui es-tu&nbsp;?</h1>
         <input
           type="text"
           value={prenom}
@@ -37,9 +37,9 @@ export default function EcranPrenom({ prenomInitial = '', onOuvrir }) {
           enterKeyHint="go"
           autoFocus
         />
-        <button className="btn-principal" onClick={valider}>Ouvrir la caisse</button>
+        <button className="btn-principal" onClick={valider}>Rejoindre la session</button>
         <p className="note">
-          Ton prénom part dans la colonne « Ajouté par » de chaque produit scanné.
+          Chacun se connecte avec son prénom : il est associé à tout ce que tu scannes, et sert à voir qui a acheté quoi.
         </p>
         {serveurPret === false && (
           <p className="note">Réveil du serveur en cours, quelques secondes…</p>

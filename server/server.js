@@ -54,6 +54,14 @@ app.post('/api/sessions', route(async (req, res) => {
   res.json(await store.sessionCreer(crypto.randomUUID(), prenom, nom));
 }));
 
+app.get('/api/sessions/en-cours', route(async (req, res) => res.json(await store.sessionEnCours())));
+
+app.post('/api/sessions/:id/rouvrir', route(async (req, res) => {
+  const s = await store.sessionRouvrir(req.params.id);
+  if (!s) return res.status(404).json({ erreur: 'Session introuvable' });
+  res.json(s);
+}));
+
 app.patch('/api/sessions/:id', route(async (req, res) => {
   const nom = String(req.body?.nom || '').trim().slice(0, 60) || null;
   const s = await store.sessionRenommer(req.params.id, nom);
@@ -107,7 +115,7 @@ app.post('/api/produits', route(async (req, res) => {
     quantite_total: b.quantite_total != null ? Number(b.quantite_total) : 1,
     prix_achat: b.prix_achat != null && b.prix_achat !== '' ? Number(b.prix_achat) : null,
     code_barres: b.code_barres || null,
-    ajoute_par: session ? session.prenom : (b.ajoute_par || null),
+    ajoute_par: b.ajoute_par || (session ? session.prenom : null),
     date_achat: b.date_achat || new Date().toISOString().slice(0, 10),
     session_id: b.session_id || null,
   });

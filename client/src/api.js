@@ -21,6 +21,8 @@ export const urlApi = BASE;
 
 export const api = {
   ouvrirSession: (prenom, nom) => poster('/api/sessions', { prenom, nom }),
+  sessionEnCours: () => requete('/api/sessions/en-cours'),
+  rouvrirSession: id => poster(`/api/sessions/${id}/rouvrir`, {}),
   renommerSession: (id, nom) => requete(`/api/sessions/${id}`, {
     method: 'PATCH', body: JSON.stringify({ nom }),
   }),

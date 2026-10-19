@@ -31,11 +31,11 @@ export default function LigneArticle({ produit, seuils, onConsommer, onSupprimer
         {stock && <span className={`chip-dlc ${stock.classe}`}>{stock.texte}</span>}
 
         <span className="stepper" title="Quantité achetée">
-          <button type="button" onClick={() => onQuantite(produit.id, -1)}
+          <button type="button" onClick={() => onQuantite(produit, -1)}
                   disabled={!(produit.quantite_total > 0)}
                   aria-label={`Une unité de moins de ${produit.article}`}>−</button>
           <b>{produit.quantite_total ?? 0}</b>
-          <button type="button" onClick={() => onQuantite(produit.id, 1)}
+          <button type="button" onClick={() => onQuantite(produit, 1)}
                   aria-label={`Une unité de plus de ${produit.article}`}>+</button>
         </span>
 

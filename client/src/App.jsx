@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import EcranPrenom from './components/EcranPrenom.jsx';
 import Ticket from './components/Ticket.jsx';
@@ -9,97 +9,143 @@ import CorrectionType from './components/CorrectionType.jsx';
 import Toast from './components/Toast.jsx';
 
 const SEUILS_DEFAUT = { rouge: 7, orange: 14, jaune: 30 };
+const SYNCHRO = 15000; // les autres téléphones ajoutent des articles : on relit régulièrement
 
-const sessionStockee = () => {
-  try { return JSON.parse(localStorage.getItem('session') || 'null'); }
-  catch { return null; }
+const prenomStocke = () => {
+  try { return localStorage.getItem('prenom') || ''; }
+  catch { return ''; }
 };
+const nomParDefaut = () => `Courses du ${new Date().toLocaleDateString('fr-FR')}`;
 
 export default function App() {
-  const [session, setSession] = useState(null);
-  const [prenomInitial, setPrenomInitial] = useState('');
+  const [prenom, setPrenom] = useState(prenomStocke);   // la personne connectée sur ce téléphone
+  const [session, setSession] = useState(null);         // la session en cours, commune à tous
   const [vue, setVue] = useState('session');
   const [produits, setProduits] = useState([]);
+  const [listeSessions, setListeSessions] = useState([]);
+  const [revision, setRevision] = useState(0);          // incrémentée à chaque modification, pour relire les détails ouverts
   const [types, setTypes] = useState([]);
   const [sections, setSections] = useState([]);
   const [seuils, setSeuils] = useState(SEUILS_DEFAUT);
   const [etatServeur, setEtatServeur] = useState(null);
-  const [prenoms, setPrenoms] = useState([]);
   const [filtre, setFiltre] = useState(null);   // prénom sélectionné, ou null
   const [scannerOuvert, setScannerOuvert] = useState(false);
   const [fiche, setFiche] = useState(null);       // { produit, source, motif }
   const [correction, setCorrection] = useState(null);
-  const [listeSessions, setListeSessions] = useState([]);
   const [toast, setToast] = useState(null);
+  const sessionRef = useRef(null);
+  sessionRef.current = session;
 
   const signaler = useCallback((message, erreur = false) => setToast({ message, erreur }), []);
 
   /* Render et Neon endorment le service après quelques minutes : on les réveille
-     dès l'ouverture, pendant que tu saisis ton prénom. Sans ça, le premier scan
-     attendrait trente secondes. */
+     dès l'ouverture, pendant que tu saisis ton prénom. */
   useEffect(() => { api.reveil().catch(() => {}); }, []);
 
-  /* --- reprise ou ouverture de session --- */
-  useEffect(() => {
-    // Une session reste ouverte jusqu'à ce qu'on en choisisse une autre.
-    const precedente = sessionStockee();
-    if (precedente) setSession(precedente);
-  }, []);
+  /* --- session en cours : on rejoint celle du serveur, ou on en crée une --- */
+  const synchroniserSession = useCallback(async (creer = false) => {
+    try {
+      let s = await api.sessionEnCours();
+      if (!s && creer) s = await api.ouvrirSession(prenom, nomParDefaut());
+      if (!s) return;
+      const precedente = sessionRef.current;
+      if (precedente && precedente.id === s.id && precedente.nom === s.nom) return;
+      if (precedente && precedente.id !== s.id) {
+        setProduits([]);
+        setFiltre(null);
+        signaler(`Nouvelle session : ${s.nom || 'Courses'}`);
+      }
+      setSession(s);
+    } catch (err) { if (creer) signaler(err.message, true); }
+  }, [prenom, signaler]);
+
+  useEffect(() => { if (prenom) synchroniserSession(true); }, [prenom, synchroniserSession]);
 
   /* --- référentiel : types, sections, seuils --- */
   const chargerReferentiel = useCallback(async () => {
     try {
-      const [t, s, etat, noms] = await Promise.all([
-        api.types(), api.sections(), api.etat(), api.prenoms(),
-      ]);
+      const [t, s, etat] = await Promise.all([api.types(), api.sections(), api.etat()]);
       setTypes(t);
       setSections(s);
-      setPrenoms(noms);
       setEtatServeur(etat);
       if (etat.seuils) setSeuils(etat.seuils);
     } catch (err) { signaler(err.message, true); }
   }, [signaler]);
 
-  /* L'écriture du classeur est différée de 1,5 s côté serveur : on relit l'état
-     un peu après pour afficher l'heure d'enregistrement, ou l'erreur. */
   const rafraichirEtat = useCallback(async (delai = 2000) => {
     setTimeout(async () => {
       try { setEtatServeur(await api.etat()); } catch { /* sans importance */ }
     }, delai);
   }, []);
 
-  const rafraichir = useCallback(async () => {
-    if (!session || vue === 'sessions') return;
+  const rafraichir = useCallback(async (silencieux = false) => {
+    if (!session || vue !== 'session') return;
     try {
-      setProduits(await api.produits(
-        vue === 'session' ? { sessionId: session.id } : { prenom: filtre || undefined }
-      ));
-    } catch (err) { signaler(err.message, true); }
-  }, [session, vue, filtre, signaler]);
-
-  useEffect(() => { if (session) chargerReferentiel(); }, [session, chargerReferentiel]);
-  useEffect(() => { rafraichir(); }, [rafraichir]);
+      setProduits(await api.produits({ sessionId: session.id }));
+    } catch (err) { if (!silencieux) signaler(err.message, true); }
+  }, [session, vue, signaler]);
 
   const chargerSessions = useCallback(async () => {
     try { setListeSessions(await api.listeSessions()); }
     catch (err) { signaler(err.message, true); }
   }, [signaler]);
-  useEffect(() => { if (session && vue === 'sessions') chargerSessions(); }, [session, vue, chargerSessions]);
 
-  /* --- actions --- */
+  useEffect(() => { if (prenom) chargerReferentiel(); }, [prenom, chargerReferentiel]);
+  useEffect(() => { rafraichir(); }, [rafraichir]);
+  useEffect(() => {
+    if (prenom && vue === 'sessions') chargerSessions();
+  }, [prenom, vue, revision, chargerSessions]);
 
-  const activer = s => {
-    localStorage.setItem('session', JSON.stringify(s));
-    setSession(s);
+  /* Les achats des autres apparaissent sans recharger la page. */
+  useEffect(() => {
+    if (!prenom) return undefined;
+    const tick = () => {
+      if (document.hidden) return;
+      synchroniserSession();
+      rafraichir(true);
+    };
+    const minuteur = setInterval(tick, SYNCHRO);
+    document.addEventListener('visibilitychange', tick);
+    return () => { clearInterval(minuteur); document.removeEventListener('visibilitychange', tick); };
+  }, [prenom, synchroniserSession, rafraichir]);
+
+  /* --- connexion --- */
+
+  const connecter = valeur => {
+    try { localStorage.setItem('prenom', valeur); } catch { /* navigation privée */ }
+    setPrenom(valeur);
+  };
+
+  const deconnecter = () => {
+    try { localStorage.removeItem('prenom'); } catch { /* idem */ }
+    setPrenom('');
+    setSession(null);
     setProduits([]);
+    setFiltre(null);
     setVue('session');
   };
 
-  const ouvrirSession = async (prenom, nom) => {
+  /* --- sessions --- */
+
+  const demarrer = s => {
+    setSession(s);
+    setProduits([]);
+    setFiltre(null);
+    setVue('session');
+  };
+
+  const nouvelleSession = async nom => {
     try {
-      const nouvelle = await api.ouvrirSession(prenom, nom);
-      activer(nouvelle);
-      if (nom) signaler(`Session « ${nom} » créée`);
+      const s = await api.ouvrirSession(prenom, nom || nomParDefaut());
+      demarrer(s);
+      signaler(`Session « ${s.nom} » démarrée`);
+    } catch (err) { signaler(err.message, true); }
+  };
+
+  const rouvrirSession = async s => {
+    try {
+      demarrer(await api.rouvrirSession(s.id));
+      signaler(`« ${s.nom || 'Courses'} » reprise`);
     } catch (err) { signaler(err.message, true); }
   };
 
@@ -107,39 +153,24 @@ export default function App() {
     try {
       const maj = await api.renommerSession(id, nom);
       setListeSessions(l => l.map(s => (s.id === id ? { ...s, nom: maj.nom } : s)));
-      if (session.id === id) {
-        const renommee = { ...session, nom: maj.nom };
-        localStorage.setItem('session', JSON.stringify(renommee));
-        setSession(renommee);
-      }
+      if (session && session.id === id) setSession(s => ({ ...s, nom: maj.nom }));
     } catch (err) { signaler(err.message, true); }
   };
 
   const supprimerSession = async id => {
     try {
       await api.supprimerSession(id);
-      if (session.id === id) {
-        localStorage.removeItem('session');
-        setSession(null);
-        return;
-      }
       setListeSessions(l => l.filter(s => s.id !== id));
+      if (session && session.id === id) {
+        setSession(null);
+        setProduits([]);
+        synchroniserSession(true);   // une autre session ouverte, ou une nouvelle
+      }
       signaler('Session supprimée');
     } catch (err) { signaler(err.message, true); }
   };
 
-  const changerQuantite = async (id, delta) => {
-    const actuel = produits.find(p => p.id === id);
-    if (!actuel) return;
-    const total = Math.max(0, (actuel.quantite_total || 0) + delta);
-    try {
-      const produit = await api.modifier(id, {
-        quantite_total: total,
-        quantite_utilisee: Math.min(actuel.quantite_utilisee || 0, total),
-      });
-      setProduits(liste => liste.map(p => (p.id === id ? produit : p)));
-    } catch (err) { signaler(err.message, true); }
-  };
+  /* --- articles --- */
 
   const surCode = useCallback(async code => {
     setScannerOuvert(false);
@@ -170,31 +201,44 @@ export default function App() {
 
   const ajouter = async charge => {
     try {
-      const produit = await api.ajouterProduit({ ...charge, session_id: session.id });
+      const produit = await api.ajouterProduit({ ...charge, session_id: session.id, ajoute_par: prenom });
       setFiche(null);
-      if (vue === 'session') setProduits(p => [produit, ...p]);
-      else await rafraichir();
+      setProduits(p => [produit, ...p]);
+      setRevision(r => r + 1);
       signaler(`${produit.article} ajouté au ticket`);
       rafraichirEtat();
       chargerReferentiel(); // le nouvel article rejoint les suggestions de son type
     } catch (err) { signaler(err.message, true); }
   };
 
+  /* Les modifications valent partout : ticket en cours et détail d'une session. */
+  const appliquer = produit => {
+    setProduits(liste => liste.map(p => (p.id === produit.id ? produit : p)));
+    setRevision(r => r + 1);
+    rafraichirEtat();
+  };
+
   const corriger = async champs => {
     try {
       const produit = await api.modifier(correction.id, champs);
-      setProduits(liste => liste.map(p => (p.id === produit.id ? produit : p)));
+      appliquer(produit);
       setCorrection(null);
       signaler(`${produit.article} mis à jour`);
-      rafraichirEtat();
     } catch (err) { signaler(err.message, true); }
   };
 
   const consommer = async id => {
+    try { appliquer(await api.consommer(id)); }
+    catch (err) { signaler(err.message, true); }
+  };
+
+  const changerQuantite = async (actuel, delta) => {
+    const total = Math.max(0, (actuel.quantite_total || 0) + delta);
     try {
-      const produit = await api.consommer(id);
-      setProduits(liste => liste.map(p => (p.id === id ? produit : p)));
-      rafraichirEtat();
+      appliquer(await api.modifier(actuel.id, {
+        quantite_total: total,
+        quantite_utilisee: Math.min(actuel.quantite_utilisee || 0, total),
+      }));
     } catch (err) { signaler(err.message, true); }
   };
 
@@ -202,42 +246,45 @@ export default function App() {
     try {
       await api.supprimer(id);
       setProduits(liste => liste.filter(p => p.id !== id));
-      signaler('Retiré du ticket');
+      setRevision(r => r + 1);
+      signaler('Article retiré');
       rafraichirEtat();
     } catch (err) { signaler(err.message, true); }
   };
 
-  if (!session) {
-    return <EcranPrenom key={prenomInitial} prenomInitial={prenomInitial} onOuvrir={ouvrirSession} />;
-  }
+  if (!prenom) return <EcranPrenom onOuvrir={connecter} />;
 
   return (
     <>
       <Ticket
+        prenom={prenom}
         session={session}
         vue={vue}
-        listeSessions={listeSessions}
-        onNouvelleSession={ouvrirSession}
-        onActiverSession={activer}
-        onRenommerSession={renommerSession}
-        onSupprimerSession={supprimerSession}
-        onQuantite={changerQuantite}
         onChangerVue={setVue}
         produits={produits}
+        listeSessions={listeSessions}
+        revision={revision}
         seuils={seuils}
         etat={etatServeur}
-        prenoms={prenoms}
         filtre={filtre}
         onFiltrer={setFiltre}
+        onNouvelleSession={nouvelleSession}
+        onRouvrirSession={rouvrirSession}
+        onRenommerSession={renommerSession}
+        onSupprimerSession={supprimerSession}
+        onDeconnecter={deconnecter}
+        onQuantite={changerQuantite}
         onConsommer={consommer}
         onSupprimer={supprimer}
         onCorriger={setCorrection}
       />
 
-      {vue !== 'sessions' && <BarreAction
-        onScanner={() => setScannerOuvert(true)}
-        onManuel={() => setFiche({ produit: {}, source: null, base: null, motif: null })}
-      />}
+      {vue === 'session' && session && (
+        <BarreAction
+          onScanner={() => setScannerOuvert(true)}
+          onManuel={() => setFiche({ produit: {}, source: null, base: null, motif: null })}
+        />
+      )}
 
       {scannerOuvert && <Scanner onCode={surCode} onFermer={() => setScannerOuvert(false)} />}
 
