@@ -28,7 +28,7 @@ export default function Ticket({ prenom, session, vue, onChangerVue, produits, s
       </header>
 
       <nav className="onglets" role="tablist">
-        {[['moi', 'Mes achats'], ['session', 'Session en cours'], ['seance', 'Séance'], ['sessions', 'Sessions']].map(([cle, libelle]) => (
+        {[['moi', 'Mes achats'], ['session', 'Session en cours'], ['sessions', 'Sessions'], ['seance', 'Séance']].map(([cle, libelle]) => (
           <button
             key={cle}
             role="tab"
