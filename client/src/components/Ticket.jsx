@@ -1,6 +1,7 @@
 import LigneArticle from './LigneArticle.jsx';
 import EtatSync from './EtatSync.jsx';
 import FiltrePersonne from './FiltrePersonne.jsx';
+import Seance from './Seance.jsx';
 import Sessions from './Sessions.jsx';
 import { parPersonne } from '../personnes.js';
 
@@ -8,7 +9,7 @@ export default function Ticket({ prenom, session, vue, onChangerVue, produits, s
                                  filtre, onFiltrer, listeSessions, revision,
                                  onNouvelleSession, onRouvrirSession, onRenommerSession,
                                  onSupprimerSession, onQuantite, onDeconnecter, onExcel,
-                                 onConsommer, onSupprimer, onCorriger }) {
+                                 onConsommer, onSupprimer, onCorriger, onErreur }) {
   // « Mes achats » est verrouillé sur la personne connectée ; « Session en cours » laisse filtrer.
   const personne = vue === 'moi' ? prenom : filtre;
   const visibles = personne ? produits.filter(p => p.ajoute_par === personne) : produits;
@@ -27,7 +28,7 @@ export default function Ticket({ prenom, session, vue, onChangerVue, produits, s
       </header>
 
       <nav className="onglets" role="tablist">
-        {[['moi', 'Mes achats'], ['session', 'Session en cours'], ['sessions', 'Sessions']].map(([cle, libelle]) => (
+        {[['seance', 'Séance'], ['moi', 'Mes achats'], ['session', 'Session en cours'], ['sessions', 'Sessions']].map(([cle, libelle]) => (
           <button
             key={cle}
             role="tab"
@@ -38,6 +39,8 @@ export default function Ticket({ prenom, session, vue, onChangerVue, produits, s
           </button>
         ))}
       </nav>
+
+      {vue === 'seance' && <Seance prenom={prenom} onErreur={onErreur} />}
 
       {vue === 'sessions' && (
         <Sessions
@@ -54,7 +57,7 @@ export default function Ticket({ prenom, session, vue, onChangerVue, produits, s
         />
       )}
 
-      {vue !== 'sessions' && session && <>
+      {vue !== 'sessions' && vue !== 'seance' && session && <>
         {vue === 'session' && (
           <FiltrePersonne personnes={parPersonne(produits)} actif={filtre} onChanger={onFiltrer} />
         )}

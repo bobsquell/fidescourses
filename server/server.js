@@ -18,7 +18,7 @@ app.use((req, res, next) => {
     res.set('Access-Control-Allow-Origin', origine);
     res.set('Vary', 'Origin');
   }
-  res.set('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+  res.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -84,6 +84,28 @@ app.post('/api/sessions/:id/fin', route(async (req, res) => {
 app.get('/api/sessions', route(async (req, res) => res.json(await store.sessions())));
 
 app.get('/api/prenoms', route(async (req, res) => res.json(await store.personnes())));
+
+/* ---------- séances : qui fait les courses, qui prépare le pot ---------- */
+
+const ROLES = ['courses', 'pot'];
+const dateValide = d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d));
+
+app.get('/api/seances/:date/roles', route(async (req, res) => {
+  if (!dateValide(req.params.date)) return res.status(400).json({ erreur: 'Date invalide' });
+  res.json(await store.seanceRoles(req.params.date));
+}));
+
+app.put('/api/seances/:date/roles', route(async (req, res) => {
+  const { date } = req.params;
+  const prenom = String(req.body?.prenom || '').trim().slice(0, 40);
+  const role = req.body?.role;
+  if (!dateValide(date)) return res.status(400).json({ erreur: 'Date invalide' });
+  if (!prenom) return res.status(400).json({ erreur: 'Prénom manquant' });
+  if (role === null) await store.seanceRoleRetirer(date, prenom);
+  else if (ROLES.includes(role)) await store.seanceRoleDefinir(date, prenom, role);
+  else return res.status(400).json({ erreur: 'Rôle invalide' });
+  res.json(await store.seanceRoles(date));
+}));
 
 /* ---------- produits ---------- */
 
@@ -175,7 +197,7 @@ app.get('/api/export.xlsx', route(async (req, res) => {
   const tampon = await fabriquerClasseur({ produits, sessions, session: concernee });
 
   const fichier = concernee
-    ? `courses-${(concernee.nom || concernee.prenom).replace(/[^\w-]+/g, '_')}.xlsx`
+    ? `courses-${(concernee.nom || concernee.prenom).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w-]+/g, '_')}.xlsx`
     : `inventaire-${new Date().toISOString().slice(0, 10)}.xlsx`;
   res.set({
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

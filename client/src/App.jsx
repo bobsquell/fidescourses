@@ -20,7 +20,7 @@ const nomParDefaut = () => `Courses du ${new Date().toLocaleDateString('fr-FR')}
 export default function App() {
   const [prenom, setPrenom] = useState(prenomStocke);   // la personne connectée sur ce téléphone
   const [session, setSession] = useState(null);         // la session en cours, commune à tous
-  const [vue, setVue] = useState('moi');       // 'moi' | 'session' | 'sessions'
+  const [vue, setVue] = useState('moi');       // 'seance' | 'moi' | 'session' | 'sessions'
   const [produits, setProduits] = useState([]);
   const [listeSessions, setListeSessions] = useState([]);
   const [revision, setRevision] = useState(0);          // incrémentée à chaque modification, pour relire les détails ouverts
@@ -79,7 +79,7 @@ export default function App() {
   }, []);
 
   const rafraichir = useCallback(async (silencieux = false) => {
-    if (!session || vue === 'sessions') return;
+    if (!session || vue === 'sessions' || vue === 'seance') return;
     try {
       setProduits(await api.produits({ sessionId: session.id }));
     } catch (err) { if (!silencieux) signaler(err.message, true); }
@@ -284,9 +284,10 @@ export default function App() {
         onConsommer={consommer}
         onSupprimer={supprimer}
         onCorriger={setCorrection}
+        onErreur={signaler}
       />
 
-      {vue !== 'sessions' && session && (
+      {vue !== 'sessions' && vue !== 'seance' && session && (
         <BarreAction
           onScanner={() => setScannerOuvert(true)}
           onManuel={() => setFiche({ produit: {}, source: null, base: null, motif: null })}

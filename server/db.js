@@ -65,6 +65,15 @@ async function initialiser() {
 
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS nom TEXT;
 
+    -- Qui fait quoi à chaque séance : « courses » ou « pot », un rôle par personne et par date.
+    CREATE TABLE IF NOT EXISTS seance_roles (
+      date   DATE NOT NULL,
+      prenom TEXT NOT NULL,
+      role   TEXT NOT NULL,
+      maj_le TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (date, prenom)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_produits_session ON produits(session_id);
     CREATE INDEX IF NOT EXISTS idx_produits_code    ON produits(code_barres);
     CREATE INDEX IF NOT EXISTS idx_produits_par     ON produits(ajoute_par);
@@ -214,7 +223,26 @@ async function personnes() {
   return rows.map(r => ({ ...r, total: nombre(r.total) }));
 }
 
+/** Rôles d'une séance, au format { date: 'YYYY-MM-DD', prenom, role }. */
+async function seanceRoles(date) {
+  const { rows } = await q(
+    `SELECT to_char(date, 'YYYY-MM-DD') AS date, prenom, role
+     FROM seance_roles WHERE date = $1 ORDER BY maj_le`, [date]);
+  return rows;
+}
+
+async function seanceRoleDefinir(date, prenom, role) {
+  await q(
+    `INSERT INTO seance_roles (date, prenom, role) VALUES ($1, $2, $3)
+     ON CONFLICT (date, prenom) DO UPDATE SET role = EXCLUDED.role, maj_le = now()`,
+    [date, prenom, role]);
+}
+
+const seanceRoleRetirer = (date, prenom) =>
+  q('DELETE FROM seance_roles WHERE date = $1 AND prenom = $2', [date, prenom]);
+
 module.exports = {
+  seanceRoles, seanceRoleDefinir, seanceRoleRetirer,
   pool, initialiser, CHAMPS,
   ajouterProduit, modifierProduit, supprimerProduit, produits, produit,
   catalogueGet, catalogueSet, bdAjouter, bdParType,

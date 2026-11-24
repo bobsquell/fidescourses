@@ -66,6 +66,10 @@ export const api = {
   ),
   prenoms: () => requete('/api/prenoms'),
   listeSessions: () => requete('/api/sessions'),
+  rolesSeance: date => requete(`/api/seances/${date}/roles`),
+  definirRole: (date, prenom, role) => requete(`/api/seances/${date}/roles`, {
+    method: 'PUT', body: JSON.stringify({ prenom, role }),
+  }),
   reveil: () => requete('/api/reveil'),
   ajouterProduit: produit => poster('/api/produits', produit),
   modifier: (id, champs) => requete(`/api/produits/${id}`, {
