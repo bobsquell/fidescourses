@@ -90,6 +90,13 @@ app.get('/api/prenoms', route(async (req, res) => res.json(await store.personnes
 const ROLES = ['courses', 'pot'];
 const dateValide = d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d));
 
+app.get('/api/seances/mes-roles', route(async (req, res) => {
+  const prenom = String(req.query.prenom || '').trim();
+  const depuis = String(req.query.depuis || '');
+  if (!prenom || !dateValide(depuis)) return res.status(400).json({ erreur: 'Paramètres invalides' });
+  res.json(await store.seancesDe(prenom, depuis));
+}));
+
 app.get('/api/seances/:date/roles', route(async (req, res) => {
   if (!dateValide(req.params.date)) return res.status(400).json({ erreur: 'Date invalide' });
   res.json(await store.seanceRoles(req.params.date));

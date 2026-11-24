@@ -238,11 +238,19 @@ async function seanceRoleDefinir(date, prenom, role) {
     [date, prenom, role]);
 }
 
+/** Les séances à venir où cette personne a déjà pris un rôle, de la plus proche à la plus lointaine. */
+async function seancesDe(prenom, depuis) {
+  const { rows } = await q(
+    `SELECT to_char(date, 'YYYY-MM-DD') AS date, prenom, role
+     FROM seance_roles WHERE prenom = $1 AND date >= $2 ORDER BY date`, [prenom, depuis]);
+  return rows;
+}
+
 const seanceRoleRetirer = (date, prenom) =>
   q('DELETE FROM seance_roles WHERE date = $1 AND prenom = $2', [date, prenom]);
 
 module.exports = {
-  seanceRoles, seanceRoleDefinir, seanceRoleRetirer,
+  seanceRoles, seancesDe, seanceRoleDefinir, seanceRoleRetirer,
   pool, initialiser, CHAMPS,
   ajouterProduit, modifierProduit, supprimerProduit, produits, produit,
   catalogueGet, catalogueSet, bdAjouter, bdParType,

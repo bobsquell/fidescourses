@@ -28,6 +28,23 @@ export default function Seance({ prenom, onErreur }) {
 
   useEffect(() => { setRoles([]); charger(); }, [charger]);
 
+  /* Les rôles des autres apparaissent sans recharger. */
+  useEffect(() => {
+    const minuteur = setInterval(() => { if (!document.hidden) charger(); }, 15000);
+    return () => clearInterval(minuteur);
+  }, [charger]);
+
+  /* Rien de mémorisé sur ce téléphone (autre appareil, données effacées) : on retrouve
+     la prochaine séance où la personne s'est déjà positionnée, enregistrée sur le serveur. */
+  useEffect(() => {
+    if (date) return undefined;
+    let vivant = true;
+    api.mesRoles(prenom, jour).then(l => {
+      if (vivant && l.length && avenir.includes(l[0].date)) { ecrireChoix(l[0].date); setDate(l[0].date); }
+    }).catch(() => {});
+    return () => { vivant = false; };
+  }, [prenom]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const choisir = d => { ecrireChoix(d); setDate(d); setListe(false); };
 
   const monRole = (roles.find(r => r.prenom === prenom) || {}).role || null;
